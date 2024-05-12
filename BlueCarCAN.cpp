@@ -14,7 +14,7 @@ BlueCarCAN::BlueCarCAN(int pinCS, int pinINT, const String nodeNames[], unsigned
             System_Data[i] = 0; 
         }
     } else {
-        static const String defaultNodeNames[] = {"Direccion", "Propulsion", "Radar"};
+        static const String defaultNodeNames[] = {"Direccion", "Propulsion", "Master"};
         static const unsigned short int defaultNumNodes = 3;
         node_names = new String[defaultNumNodes];
         System_Data = new unsigned int[defaultNumNodes];
@@ -81,13 +81,17 @@ void BlueCarCAN::config_node(String node_name, int config_can) {
 
 void BlueCarCAN::is4Me() {
     receiveCanMessage();
+  if (globalRxId == map_name2nodeid("Master")*2 - 1) {
+      Serial.println("Yes :D");
+      read_message[0] = globalRxBuf[node_arduino-1];
+  }
 
-    if (globalRxId == can_id_frame_lectura) {
+   /* if (globalRxId == can_id_frame_lectura) {
         for (int i = 0; i < 8; i++) {
             Serial.println("Yes :D");
             read_message[i] = globalRxBuf[i];
         }
-    }
+    }*/
 }
 
 void BlueCarCAN::myData() {
@@ -112,7 +116,7 @@ void BlueCarCAN::send2Jetson() {
     }
     json += "}";
 }
-
+/*
 void BlueCarCAN::readJetson() {
     int key = 0;
     int value = 0;
@@ -122,22 +126,61 @@ void BlueCarCAN::readJetson() {
         if (colonPos == -1) break;
         String nodeNameExt = json_received.substring(pos, colonPos);
         key = map_name2nodeid(nodeNameExt);
+     
         int commaPos = json_received.indexOf(',', colonPos);
         if (commaPos == -1) {
             commaPos = json_received.length() - 1;
         }
         value = json_received.substring(colonPos + 1, commaPos).toInt();
+        if (key-1 >= 0 && key-1 < 8){
+          write_message[key-1] = value;
+        }
+        
 
-        write_message[0] = value;
+        if (node_arduino == key) {
+            read_message[0] = value;
+        }
+        pos = commaPos + 1;
+    }
+     sendCanMessage(can_id_frame_envio, len, write_message);
+}*/
+void BlueCarCAN::readJetson() {
+    int key = 0;
+    int value = 0;
+    int pos = json_received.indexOf('{') + 1; // Asegura empezar después de la llave inicial si existe
+
+    while (pos < json_received.length() - 1) { // Ajuste para evitar el último caracter si es una llave }
+        int colonPos = json_received.indexOf(':', pos);
+        if (colonPos == -1) break; // Sale del ciclo si no hay más claves
+
+        int keyStart = json_received.lastIndexOf(',', colonPos) + 1;
+        if (keyStart < pos) keyStart = pos; // Ajusta si es el primer elemento
+        String nodeNameExt = json_received.substring(keyStart, colonPos);
+        nodeNameExt.trim(); // Limpia espacios antes de procesar el ID
+        key = map_name2nodeid(nodeNameExt);
+
+        int commaPos = json_received.indexOf(',', colonPos);
+        if (commaPos == -1) commaPos = json_received.indexOf('}', colonPos);
+        if (commaPos == -1) commaPos = json_received.length(); // Ultimo valor si no hay más delimitadores
+
+        String valueStr = json_received.substring(colonPos + 1, commaPos);
+        valueStr.trim(); // Limpia espacios después de extraer el substring
+        value = valueStr.toInt();
+
+        if (key - 1 >= 0 && key - 1 < 8) {
+            write_message[key - 1] = value;
+        }
+
         if (node_arduino == key) {
             read_message[0] = value;
         }
 
-        sendCanMessage(2 * key, len, write_message);
-
-        pos = commaPos + 2;
+        pos = commaPos + 1;
     }
+    sendCanMessage(can_id_frame_envio, len, write_message);
 }
+
+
 
 void BlueCarCAN::setWriteMessage(byte index, byte value) {
     if (index < sizeof(write_message)) {
