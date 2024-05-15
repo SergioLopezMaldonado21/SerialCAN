@@ -13,10 +13,10 @@ public:
     int sendCanMessage(unsigned long id, unsigned char len, unsigned char *data, int attempts = 3);
     void receiveCanMessage();
     void config_node(String node_name, int config_can = 0);
-    void is4Me();
+    void is4Me(int debug = 0);
     void myData();
     void send2Jetson();
-    void readJetson();
+    void readJetson(int debbug = 0);
     void setWriteMessage(byte index, byte value);
     int map_name2nodeid(String node_name);
     byte getReadMessage(byte index);
